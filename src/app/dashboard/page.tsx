@@ -172,7 +172,9 @@ export default function DashboardPage() {
       .eq('user_id', user.id)
       .then(({ data, error }) => {
         console.log('leagues:', data, error);
-        const ls = (data ?? []).map((lm: any) => lm.leagues).filter(Boolean);
+        const ls = (data ?? []).map((lm: any) => 
+  Array.isArray(lm.leagues) ? lm.leagues[0] : lm.leagues
+).filter(Boolean);
         setLeagues(ls);
         if (ls.length > 0 && !activeLeagueId) {
           setActiveLeagueId(ls[0].id);
