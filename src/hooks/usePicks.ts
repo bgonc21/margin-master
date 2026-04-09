@@ -47,8 +47,11 @@ export function usePicks(leagueId: string | null, week: number) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
-  const fetchData = useCallback(async () => {
-    if (!leagueId) return;
+const fetchData = useCallback(async () => {
+    if (!leagueId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
 
