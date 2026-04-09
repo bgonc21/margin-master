@@ -87,7 +87,7 @@ const fetchData = useCallback(async () => {
         .from('weekly_designated_games')
         .select('game_id, description')
         .eq('week', week)
-        .single();
+        .maybeSingle();
 
       setDesignatedGame(dgData ?? null);
 
