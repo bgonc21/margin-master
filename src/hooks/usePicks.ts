@@ -1,8 +1,8 @@
+
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { supabase } from '../lib/supabase';
-import { authFetch } from '../lib/supabase';
+import { supabase, getUser } from '../lib/supabase';
 
 export interface Game {
   id: string;
@@ -45,9 +45,14 @@ export function usePicks(leagueId: string | null, week: number) {
   const [designatedGame, setDesignatedGame] = useState<WeeklyDesignatedGame | null>(null);
   const [usedCities, setUsedCities] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
+  const [userId, setUserId] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
-const fetchData = useCallback(async () => {
+  useEffect(() => {
+    getUser().then(u => setUserId(u?.id ?? null));
+  }, []);
+
+  const fetchData = useCallback(async () => {
     if (!leagueId) {
       setLoading(false);
       return;
@@ -56,7 +61,6 @@ const fetchData = useCallback(async () => {
     setError(null);
 
     try {
-      // Fetch games for this week
       const { data: gamesData, error: gamesErr } = await supabase
         .from('games')
         .select('*')
@@ -67,12 +71,10 @@ const fetchData = useCallback(async () => {
       if (gamesErr) throw gamesErr;
       setGames(gamesData ?? []);
 
-      // Fetch this week's picks
-      const picksRes = await authFetch(`/api/picks?league_id=${leagueId}&week=${week}`);
+      const picksRes = await fetch(`/api/picks?league_id=${leagueId}&week=${week}`);
       const picksData = await picksRes.json();
       setPicks(picksData.data ?? []);
 
-      // Fetch all locked cities for this user in this league
       const { data: usedData } = await supabase
         .from('picks')
         .select('city_picked')
@@ -82,7 +84,6 @@ const fetchData = useCallback(async () => {
 
       setUsedCities(new Set((usedData ?? []).map(p => p.city_picked)));
 
-      // Fetch designated game for tiebreaker
       const { data: dgData } = await supabase
         .from('weekly_designated_games')
         .select('game_id, description')
@@ -100,17 +101,18 @@ const fetchData = useCallback(async () => {
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
-  // Current week pick
   const currentPick = picks.find(p => p.week === week && !p.is_penalty) ?? null;
 
   async function stagePick(gameId: string, city: string) {
-    const res = await authFetch('/api/picks', {
+    const res = await fetch('/api/picks', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         league_id: leagueId,
         week,
         game_id: gameId,
         city_picked: city,
+        user_id: userId,
         action: 'stage',
       }),
     });
@@ -121,8 +123,9 @@ const fetchData = useCallback(async () => {
   }
 
   async function lockPick(scoreGuess?: number, secondaryGameId?: string, secondaryCity?: string) {
-    const res = await authFetch('/api/picks', {
+    const res = await fetch('/api/picks', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         league_id: leagueId,
         week,
@@ -131,6 +134,7 @@ const fetchData = useCallback(async () => {
         score_guess: scoreGuess,
         secondary_game_id: secondaryGameId,
         secondary_city: secondaryCity,
+        user_id: userId,
         action: 'lock',
       }),
     });
@@ -141,12 +145,14 @@ const fetchData = useCallback(async () => {
   }
 
   async function changePick() {
-    const res = await authFetch('/api/picks', {
+    const res = await fetch('/api/picks', {
       method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         league_id: leagueId,
         week,
         city_picked: currentPick?.city_picked ?? '',
+        user_id: userId,
         action: 'change',
       }),
     });
